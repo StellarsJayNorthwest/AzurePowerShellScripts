@@ -49,12 +49,12 @@ foreach ($subscription in Get-AzSubscription) {
             "SubscriptionName" = $sub.Name;
             "ResourceGroup" = $sqlServer.ResourceGroupName;
             "Location" = $sqlServer.Location;
-            "ResourceId" = $sqlServer.ResourceId;
             "ServerName" = $sqlServer.ServerName;
             "ServerVersion" = $sqlServer.ServerVersion;
             "ManagedVm" = $managedVm;
             "VmSize" = $vmSize;
             "OsType" = $osType;
+            "ResourceId" = $sqlServer.ResourceId;
         }
 
         # Add this new CSV entry to the end of the CSV entry array.
