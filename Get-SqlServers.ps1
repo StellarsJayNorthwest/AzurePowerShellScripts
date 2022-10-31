@@ -23,7 +23,7 @@ foreach ($subscription in Get-AzSubscription) {
     Write-Host "Searching subscription $($subscription.Name) $($subscription.SubscriptionId) for SQL servers ..."
 
     # Iterate all of the available SQL servers in this Azure subscription.
-    foreach ($sqlServer in (Get-AzSqlServer)) {
+    foreach ($sqlServer in Get-AzSqlServer) {
 
         Write-Host "Found SQL server `"$($sqlServer.ServerName)`" in subscription `"$($subscription.Name)`", resource group `"$($sqlServer.ResourceGroupName)`""
 
@@ -33,11 +33,11 @@ foreach ($subscription in Get-AzSubscription) {
         # with that name so this must be a managed SQL server.
         $azureVm = Get-AzVM -Name "my-test-vmn"
         if ($azureVm) {
-            $managedVm = "Yes"
+            $managedVm = "No"
             $vmSize = $azureVm.HardwareProfile.VmSize
             $osType = $azureVm.StorageProfile.OsDisk.OsType
         } else {
-            $managedVm = "No"
+            $managedVm = "Yes"
             $vmSize = "Unknown"
             $osType = "Unknown"
         }
