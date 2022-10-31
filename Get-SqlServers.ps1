@@ -44,7 +44,7 @@ foreach ($subscription in Get-AzSubscription) {
 
 
         # Create a new entry for the CSV with each of the desired properties.
-        $newCsvEntry = [PSCustomObject]@{
+        $newCsvEntry = [PSCustomObject] @{
             "SubscriptionId" = $sub.SubscriptionId;
             "SubscriptionName" = $sub.Name;
             "ResourceGroup" = $sqlServer.ResourceGroupName;
@@ -57,7 +57,7 @@ foreach ($subscription in Get-AzSubscription) {
             "OsType" = $osType;
         }
 
-        # Add this new CSV entry to the 
+        # Add this new CSV entry to the end of the CSV entry array.
         $sqlServersCsv += $newCsvEntry;
     }
 }
