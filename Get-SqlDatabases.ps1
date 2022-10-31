@@ -1,49 +1,67 @@
+#
+# Pre-requisites:
+# Azure PowerShell must be installed on the machine.
+# Run Connect-AzAccount in the current PowerShell session.
+#
+
 [CmdletBinding()]
 Param(
-    [string]$OutFile = ".\databases.csv"
+    [string]$OutFile = ".\sqlservers.csv"
 )
 
 Write-Host
 
-$databaseCsv = @()
-$databasesFound = 0
-$serversFound = 0
-foreach ($sub in Get-AzSubscription) {
-    foreach ($rg in Get-AzResourceGroup) {
-        Write-Host "Searching resource group $($rg.ResourceGroupName) in subscription $($sub.SubscriptionId)"
-        foreach ($s in (Get-AzSqlServer -ResourceGroup $rg.ResourceGroupName)) {
-            Write-Host "Found SQL server $($s.ServerName) in resource group $($rg.ResourceGroupName)"
-            ++$serversFound
-            foreach ($d in (Get-AzSqlDatabase -ServerName $s.ServerName -ResourceGroupName $rg.ResourceGroupName)) {
-                if ($d.DatabaseName -eq "master")
-                {
-                    Write-Host "Found SQL database $($d.DatabaseName) on server $($d.ServerName) in resource group $($d.ResourceGroupName) with SkuName '$($d.SkuName)' and LicenseType '$($d.LicenseType)'"
+# Create an empty array to hold the CSV entries. As the script runs it will add elements to $sqlServersCsv for each
+# SQL server found.
+$sqlServersCsv = @()
 
-                    ++$databasesFound
+# First, enumerate all of the available subscriptions. This could be changed to take a list of subscriptions on the
+# command line, or take a list of subscriptions from a file. For now we'll just enumerate all subscriptions that the
+# user has access to.
+foreach ($subscription in Get-AzSubscription) {
 
-                    $licenseType = $d.LicenseType
-                    if (-not $licenseType) {
-                        $licenseType = "(none)"
-                    }
+    Write-Host "Searching subscription $($subscription.Name) $($subscription.SubscriptionId) for SQL servers ..."
 
-                    $newCsvLine = [PSCustomObject]@{
-                        "SubscriptionId" = $sub.SubscriptionId;
-                        "SubscriptionName" = $sub.Name;
-                        "ResourceGroup" = $d.ResourceGroupName;
-                        "Server" = $d.ServerName;
-                        "Database" = $d.DatabaseName;
-                        "SkuName" = $d.SkuName;
-                        "LicenseType" = $licenseType;
-                    }
-                    $databaseCsv += $newCsvLine;
-                }
-            }
+    # Iterate all of the available SQL servers in this Azure subscription.
+    foreach ($sqlServer in (Get-AzSqlServer)) {
+
+        Write-Host "Found SQL server `"$($sqlServer.ServerName)`" in subscription `"$($subscription.Name)`", resource group `"$($sqlServer.ResourceGroupName)`""
+
+        # !!! NOTE: I'm not certain looking up the VM by name will work here but we can try it out. !!!
+        #
+        # Try to retrieve the name of the SQL server as an Azure VM. If this fails then there is no standalone Azure VM
+        # with that name so this must be a managed SQL server.
+        $azureVm = Get-AzVM -Name "my-test-vmn"
+        if ($azureVm) {
+            $managedVm = "Yes"
+            $vmSize = $azureVm.HardwareProfile.VmSize
+            $osType = $azureVm.StorageProfile.OsDisk.OsType
+        } else {
+            $managedVm = "No"
+            $vmSize = "Unknown"
+            $osType = "Unknown"
         }
+
+
+        # Create a new entry for the CSV with each of the desired properties.
+        $newCsvEntry = [PSCustomObject]@{
+            "SubscriptionId" = $sub.SubscriptionId;
+            "SubscriptionName" = $sub.Name;
+            "ResourceGroup" = $sqlServer.ResourceGroupName;
+            "Location" = $sqlServer.Location;
+            "ResourceId" = $sqlServer.ResourceId;
+            "ServerName" = $sqlServer.ServerName;
+            "ServerVersion" = $sqlServer.ServerVersion;
+            "ManagedVm" = $managedVm;
+            "VmSize" = $vmSize;
+            "OsType" = $osType;
+        }
+
+        # Add this new CSV entry to the 
+        $sqlServersCsv += $newCsvEntry;
     }
 }
 
-Write-Host
-Write-Host "Found a total of $serversFound servers and $databasesFound databases"
-
-$databaseCsv | Export-Csv $OutFile -Force
-Write-Host "Exported databases to $OutFile"
+# Export the array of CSV entries to the output file.
+$sqlServersCsv | Export-Csv $OutFile -Force
+Write-Host "Exported $($sqlServersCsv.Count) SQL server entries to $OutFile"
