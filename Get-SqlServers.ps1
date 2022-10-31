@@ -31,7 +31,7 @@ foreach ($subscription in Get-AzSubscription) {
         #
         # Try to retrieve the name of the SQL server as an Azure VM. If this fails then there is no standalone Azure VM
         # with that name so this must be a managed SQL server.
-        $azureVm = Get-AzVM -Name "my-test-vmn"
+        $azureVm = Get-AzVM -Name $sqlServer.ServerName
         if ($azureVm) {
             $managedVm = "No"
             $vmSize = $azureVm.HardwareProfile.VmSize
