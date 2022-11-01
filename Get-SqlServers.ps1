@@ -42,7 +42,6 @@ foreach ($subscription in Get-AzSubscription) {
             $osType = "Unknown"
         }
 
-
         # Create a new entry for the CSV with each of the desired properties.
         $newCsvEntry = [PSCustomObject] @{
             "SubscriptionId" = $sub.SubscriptionId;
@@ -63,5 +62,5 @@ foreach ($subscription in Get-AzSubscription) {
 }
 
 # Export the array of CSV entries to the output file.
-$sqlServersCsv | Export-Csv $OutFile -Force
+$sqlServersCsv | Export-Csv $OutFile -Force -NoTypeInformation
 Write-Host "Exported $($sqlServersCsv.Count) SQL server entries to $OutFile"
