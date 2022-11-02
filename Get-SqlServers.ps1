@@ -3,9 +3,13 @@
 # Azure PowerShell must be installed on the machine.
 # Run Connect-AzAccount in the current PowerShell session.
 #
+# To specify one or more subscriptions use:
+# .\Get-SqlServers.ps1 -SubscriptionIds ("69db6f5b-4fbe-42df-b96e-1ff93b45f90f", "d58769f5-f832-4cd5-9dd6-49529bf2ba56")
+#
 
 [CmdletBinding()]
 Param(
+    [string[]]$SubscriptionIds,
     [string]$OutFile = ".\sqlservers.csv"
 )
 
@@ -15,51 +19,93 @@ Write-Host
 # SQL server found.
 $sqlServersCsv = @()
 
+# Determine the list of subscription IDs to search. If one or more subscription IDs was passed in the SubscriptionIds
+# argument, use those subscriptions. If the SubscriptionIds argument was empty, search all available subscriptions.
+$subscriptionsToSearch = @()
+if ($SubscriptionIds) {
+    # For each subscription ID in the input parameter, retrieve the subscription object and add it to the list.
+    foreach ($id in $SubscriptionIds) {
+        $sub = Get-AzSubscription -SubscriptionId $id
+        $subscriptionsToSearch += $sub
+    }
+} else {
+    $subscriptionsToSearch = Get-AzSubscription
+}
+
 # First, enumerate all of the available subscriptions. This could be changed to take a list of subscriptions on the
 # command line, or take a list of subscriptions from a file. For now we'll just enumerate all subscriptions that the
 # user has access to.
-foreach ($subscription in Get-AzSubscription) {
+foreach ($subscription in $subscriptionsToSearch) {
 
-    Write-Host "Searching subscription $($subscription.Name) $($subscription.SubscriptionId) for SQL servers ..."
+    Write-Host "Searching subscription named `"$($subscription.Name)`" and ID $($subscription.SubscriptionId)..."
 
     # Select this subscription. This will cause Get-AzSqlServer will retrieve all of the SQL servers for this subscription.
     $subscription | Select-AzSubscription 
 
-    # Iterate all of the available SQL servers in this Azure subscription.
+    # Using Get-AzSqlServer, iterate all of the available SQL servers in this Azure subscription.
     foreach ($sqlServer in Get-AzSqlServer) {
 
-        Write-Host "Found SQL server `"$($sqlServer.ServerName)`" in subscription `"$($subscription.Name)`", resource group `"$($sqlServer.ResourceGroupName)`""
+        Write-Host "Get-AzSqlServer returned SQL server `"$($sqlServer.ServerName)`" in subscription `"$($subscription.Name)`", resource group `"$($sqlServer.ResourceGroupName)`""
 
-        # !!! NOTE: I'm not certain looking up the VM by name will work here but we can try it out. !!!
-        #
-        # Try to retrieve the name of the SQL server as an Azure VM. If this fails then there is no standalone Azure VM
-        # with that name so this must be a managed SQL server.
+        # See if this is a standlone Azure VM by invoking Get-AzVM on the SQL server's name.
+        # Determine values for VmType, VmSizeOrSku, OsType, LicenseType.
         $azureVm = Get-AzVM -Name $sqlServer.ServerName
         if ($azureVm) {
-            $managedVm = "No"
-            $vmSize = $azureVm.HardwareProfile.VmSize
+            $vmType = "Standalone"
+            $vmSizeOrSku = $azureVm.HardwareProfile.VmSize
             $osType = $azureVm.StorageProfile.OsDisk.OsType
             $licenseType = $azureVm.LicenseType
         } else {
-            $managedVm = "Yes"
-            $vmSize = "Managed"
-            $osType = "Managed"
-            $licenseType = "Managed"
+            $vmType = "AzSqlServer"
+            $vmSizeOrSku = ""
+            $osType = ""
+            $licenseType = ""
         }
 
         # Create a new entry for the CSV with each of the desired properties.
         $newCsvEntry = [PSCustomObject] @{
+            "Name" = $sqlServer.ServerName;
+            "VmType" = $vmType;
             "SubscriptionId" = $subscription.SubscriptionId;
             "SubscriptionName" = $subscription.Name;
             "ResourceGroup" = $sqlServer.ResourceGroupName;
             "Location" = $sqlServer.Location;
-            "ServerName" = $sqlServer.ServerName;
             "ServerVersion" = $sqlServer.ServerVersion;
-            "ManagedVm" = $managedVm;
-            "VmSize" = $vmSize;
+            "VmSizeOrSku" = $vmSizeOrSku;
             "OsType" = $osType;
             "LicenseType" = $licenseType;
             "ResourceId" = $sqlServer.ResourceId;
+        }
+
+        # Add this new CSV entry to the end of the CSV entry array.
+        $sqlServersCsv += $newCsvEntry;
+    }
+
+    # Using Get-AzSqlVM, iterate all of the available SQL VMs in this Azure subscription.
+    foreach ($sqlVm in Get-AzSqlVM) {
+
+        Write-Host "Get-AzSqlVM returned SQL server VM `"$($sqlVm.Name)`" in subscription `"$($subscription.Name)`", resource group `"$($sqlVm.ResourceGroupName)`""
+
+        # Determine values for VmType, VmSizeOrSku, OsType, LicenseType.
+        # Note that the "Offer" field is reported as "OsType" since it seems to contain OS details.
+        $vmType = "AzSqlVM"
+        $vmSizeOrSku = $sqlVm.Sku
+        $osType = $sqlVm.Offer
+        $licenseType = $sqlVm.LicenseType
+
+        # Create a new entry for the CSV with each of the desired properties.
+        $newCsvEntry = [PSCustomObject] @{
+            "Name" = $sqlVm.Name;
+            "VmType" = $vmType;
+            "SubscriptionId" = $subscription.SubscriptionId;
+            "SubscriptionName" = $subscription.Name;
+            "ResourceGroup" = $sqlVm.ResourceGroupName;
+            "Location" = $sqlVm.Location;
+            "ServerVersion" = "";
+            "VmSizeOrSku" = $vmSizeOrSku;
+            "OsType" = $osType;
+            "LicenseType" = $licenseType;
+            "ResourceId" = $sqlVm.ResourceId;
         }
 
         # Add this new CSV entry to the end of the CSV entry array.
@@ -69,4 +115,4 @@ foreach ($subscription in Get-AzSubscription) {
 
 # Export the array of CSV entries to the output file.
 $sqlServersCsv | Export-Csv $OutFile -Force -NoTypeInformation
-Write-Host "Exported $($sqlServersCsv.Count) SQL server entries to $OutFile"
+Write-Host "Exported $($sqlServersCsv.Count) entries to $OutFile"
