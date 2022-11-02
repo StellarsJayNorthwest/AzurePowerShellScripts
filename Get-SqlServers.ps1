@@ -22,6 +22,9 @@ foreach ($subscription in Get-AzSubscription) {
 
     Write-Host "Searching subscription $($subscription.Name) $($subscription.SubscriptionId) for SQL servers ..."
 
+    # Select this subscription. This will cause Get-AzSqlServer will retrieve all of the SQL servers for this subscription.
+    $subscription | Select-AzSubscription 
+
     # Iterate all of the available SQL servers in this Azure subscription.
     foreach ($sqlServer in Get-AzSqlServer) {
 
