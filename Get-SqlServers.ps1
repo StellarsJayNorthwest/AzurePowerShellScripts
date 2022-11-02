@@ -39,16 +39,18 @@ foreach ($subscription in Get-AzSubscription) {
             $managedVm = "No"
             $vmSize = $azureVm.HardwareProfile.VmSize
             $osType = $azureVm.StorageProfile.OsDisk.OsType
+            $licenseType = $azureVm.LicenseType
         } else {
             $managedVm = "Yes"
-            $vmSize = "Unknown"
-            $osType = "Unknown"
+            $vmSize = "Managed"
+            $osType = "Managed"
+            $licenseType = "Managed"
         }
 
         # Create a new entry for the CSV with each of the desired properties.
         $newCsvEntry = [PSCustomObject] @{
-            "SubscriptionId" = $sub.SubscriptionId;
-            "SubscriptionName" = $sub.Name;
+            "SubscriptionId" = $subscription.SubscriptionId;
+            "SubscriptionName" = $subscription.Name;
             "ResourceGroup" = $sqlServer.ResourceGroupName;
             "Location" = $sqlServer.Location;
             "ServerName" = $sqlServer.ServerName;
@@ -56,6 +58,7 @@ foreach ($subscription in Get-AzSubscription) {
             "ManagedVm" = $managedVm;
             "VmSize" = $vmSize;
             "OsType" = $osType;
+            "LicenseType" = $licenseType;
             "ResourceId" = $sqlServer.ResourceId;
         }
 
