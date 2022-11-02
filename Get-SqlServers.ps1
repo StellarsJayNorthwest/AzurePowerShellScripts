@@ -37,7 +37,7 @@ if ($SubscriptionIds) {
 # user has access to.
 foreach ($subscription in $subscriptionsToSearch) {
 
-    Write-Host "Searching subscription named `"$($subscription.Name)`" and ID $($subscription.SubscriptionId)..."
+    Write-Host "Searching subscription named `"$($subscription.Name)`" with ID $($subscription.SubscriptionId)..."
 
     # Select this subscription. This will cause Get-AzSqlServer will retrieve all of the SQL servers for this subscription.
     $subscription | Select-AzSubscription 
@@ -45,12 +45,13 @@ foreach ($subscription in $subscriptionsToSearch) {
     # Using Get-AzSqlServer, iterate all of the available SQL servers in this Azure subscription.
     foreach ($sqlServer in Get-AzSqlServer) {
 
-        Write-Host "Get-AzSqlServer returned SQL server `"$($sqlServer.ServerName)`" in subscription `"$($subscription.Name)`", resource group `"$($sqlServer.ResourceGroupName)`""
+        Write-Host "Get-AzSqlServer returned SQL server `"$($sqlServer.ServerName)`" in resource group `"$($sqlServer.ResourceGroupName)`""
 
         # See if this is a standlone Azure VM by invoking Get-AzVM on the SQL server's name.
         # Determine values for VmType, VmSizeOrSku, OsType, LicenseType.
         $azureVm = Get-AzVM -Name $sqlServer.ServerName
         if ($azureVm) {
+            Write-Host "Get-AzVM returned a standalone VM for `"$($sqlServer.ServerName)`" in resource group `"$($sqlServer.ResourceGroupName)`""
             $vmType = "Standalone"
             $vmSizeOrSku = $azureVm.HardwareProfile.VmSize
             $osType = $azureVm.StorageProfile.OsDisk.OsType
@@ -84,7 +85,7 @@ foreach ($subscription in $subscriptionsToSearch) {
     # Using Get-AzSqlVM, iterate all of the available SQL VMs in this Azure subscription.
     foreach ($sqlVm in Get-AzSqlVM) {
 
-        Write-Host "Get-AzSqlVM returned SQL server VM `"$($sqlVm.Name)`" in subscription `"$($subscription.Name)`", resource group `"$($sqlVm.ResourceGroupName)`""
+        Write-Host "Get-AzSqlVM returned SQL server VM `"$($sqlVm.Name)`" in resource group `"$($sqlVm.ResourceGroupName)`""
 
         # Determine values for VmType, VmSizeOrSku, OsType, LicenseType.
         # Note that the "Offer" field is reported as "OsType" since it seems to contain OS details.
