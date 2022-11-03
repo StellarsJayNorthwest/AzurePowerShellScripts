@@ -3,7 +3,8 @@
 # Azure PowerShell must be installed on the machine.
 # Run Connect-AzAccount in the current PowerShell session.
 #
-# To specify one or more subscriptions use:
+# To specify one or more subscriptions on the command line use:
+# .\Get-SqlServers.ps1 -SubscriptionIds "69db6f5b-4fbe-42df-b96e-1ff93b45f90f"
 # .\Get-SqlServers.ps1 -SubscriptionIds ("69db6f5b-4fbe-42df-b96e-1ff93b45f90f", "d58769f5-f832-4cd5-9dd6-49529bf2ba56")
 #
 
