@@ -17,6 +17,68 @@ Param(
 
 Write-Host
 
+# Determine the list of subscription IDs to search. If one or more subscription IDs was passed in the SubscriptionIds
+# argument, use those subscriptions. If the SubscriptionIds argument was empty, search all available subscriptions.
+$subscriptionsToSearch = @()
+if ($SubscriptionIds) {
+    # For each subscription ID in the input parameter, retrieve the subscription object and add it to the list.
+    foreach ($id in $SubscriptionIds) {
+        $sub = Get-AzSubscription -SubscriptionId $id
+        $subscriptionsToSearch += $sub
+    }
+} else {
+    $subscriptionsToSearch = Get-AzSubscription
+}
+
+# Create an empty array to hold the CSV entries. As the script runs it will add elements to $sqlServersCsv for each
+# SQL server found.
+$global:sqlServersCsv = @()
+
+# First, enumerate all of the available subscriptions. This could be changed to take a list of subscriptions on the
+# command line, or take a list of subscriptions from a file. For now we'll just enumerate all subscriptions that the
+# user has access to.
+foreach ($subscription in $subscriptionsToSearch) {
+
+    Write-Host "Searching subscription named `"$($subscription.Name)`" with ID $($subscription.SubscriptionId)..."
+
+    # Select this subscription. This will cause Get-AzSqlServer will retrieve all of the SQL servers for this subscription.
+    $subscription | Select-AzSubscription 
+    Write-Host
+
+    # Using Get-AzSqlServer, iterate all of the available SQL servers in this Azure subscription.
+    foreach ($sqlServer in Get-AzSqlServer) {
+
+        # Try to get an AzVm object for the SQL server's name.
+        $azureVm = Get-AzVM -Name $sqlServer.ServerName
+
+        Add-CsvEntryForServer -Subscription $subscription -AzSqlServer $sqlServer -AzVm $azureVm -CostDays $CostDays
+    }
+
+    # Using Get-AzSqlVM, iterate all of the available SQL VMs in this Azure subscription.
+    foreach ($sqlVm in Get-AzSqlVM) {
+
+        # Try to get an AzVm object for the SQL VM's name.s
+        $azureVm = Get-AzVM -Name $sqlVm.Name
+
+        Add-CsvEntryForServer -Subscription $subscription -AzSqlVm $sqlVm -AzVm $azureVm -CostDays $CostDays
+    }
+
+    <#
+    # Note: This just for testing/experimentation. Add-CsvEntryForServer works on any Azure VM. So you can
+    # pass each VM from Get-AzVM into Add-CsvEntryForServer to generate a report line for all VMs.
+
+    # Using Get-AzVM, iterate all of the available Azure VMs in this Azure subscription.
+    foreach ($azVm in Get-AzVM) {
+
+        Add-CsvEntryForServer -Subscription $subscription -AzVm $azVm -CostDays $CostDays
+    }
+    #>
+}
+
+# Export the array of CSV entries to the output file.
+$global:sqlServersCsv | Export-Csv $OutFile -Force -NoTypeInformation
+Write-Host "Exported $($global:sqlServersCsv.Count) entries to $OutFile"
+
 # This function adds a line to the array of CSV entries. Having this code in a function eliminates the danger of 
 # having different copies of this code create CSV entries differently. It also makes the foreach loops below easier
 # to read. This function can take an AzVM object, or an AzSqlVM object, or an AzSqlServer object.
@@ -162,65 +224,3 @@ function Add-CsvEntryForServer() {
     # Add the new CSV entry to the end of the CSV entry array.
     $global:sqlServersCsv += $newCsvEntry;
 }
-
-# Determine the list of subscription IDs to search. If one or more subscription IDs was passed in the SubscriptionIds
-# argument, use those subscriptions. If the SubscriptionIds argument was empty, search all available subscriptions.
-$subscriptionsToSearch = @()
-if ($SubscriptionIds) {
-    # For each subscription ID in the input parameter, retrieve the subscription object and add it to the list.
-    foreach ($id in $SubscriptionIds) {
-        $sub = Get-AzSubscription -SubscriptionId $id
-        $subscriptionsToSearch += $sub
-    }
-} else {
-    $subscriptionsToSearch = Get-AzSubscription
-}
-
-# Create an empty array to hold the CSV entries. As the script runs it will add elements to $sqlServersCsv for each
-# SQL server found.
-$global:sqlServersCsv = @()
-
-# First, enumerate all of the available subscriptions. This could be changed to take a list of subscriptions on the
-# command line, or take a list of subscriptions from a file. For now we'll just enumerate all subscriptions that the
-# user has access to.
-foreach ($subscription in $subscriptionsToSearch) {
-
-    Write-Host "Searching subscription named `"$($subscription.Name)`" with ID $($subscription.SubscriptionId)..."
-
-    # Select this subscription. This will cause Get-AzSqlServer will retrieve all of the SQL servers for this subscription.
-    $subscription | Select-AzSubscription 
-    Write-Host
-
-    # Using Get-AzSqlServer, iterate all of the available SQL servers in this Azure subscription.
-    foreach ($sqlServer in Get-AzSqlServer) {
-
-        # Try to get an AzVm object for the SQL server's name.
-        $azureVm = Get-AzVM -Name $sqlServer.ServerName
-
-        Add-CsvEntryForServer -Subscription $subscription -AzSqlServer $sqlServer -AzVm $azureVm -CostDays $CostDays
-    }
-
-    # Using Get-AzSqlVM, iterate all of the available SQL VMs in this Azure subscription.
-    foreach ($sqlVm in Get-AzSqlVM) {
-
-        # Try to get an AzVm object for the SQL VM's name.s
-        $azureVm = Get-AzVM -Name $sqlVm.Name
-
-        Add-CsvEntryForServer -Subscription $subscription -AzSqlVm $sqlVm -AzVm $azureVm -CostDays $CostDays
-    }
-
-    <#
-    # Note: This just for testing/experimentation. Add-CsvEntryForServer works on any Azure VM. So you can
-    # pass each VM from Get-AzVM into Add-CsvEntryForServer to generate a report line for all VMs.
-
-    # Using Get-AzVM, iterate all of the available Azure VMs in this Azure subscription.
-    foreach ($azVm in Get-AzVM) {
-
-        Add-CsvEntryForServer -Subscription $subscription -AzVm $azVm -CostDays $CostDays
-    }
-    #>
-}
-
-# Export the array of CSV entries to the output file.
-$global:sqlServersCsv | Export-Csv $OutFile -Force -NoTypeInformation
-Write-Host "Exported $($global:sqlServersCsv.Count) entries to $OutFile"
