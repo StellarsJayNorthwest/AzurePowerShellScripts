@@ -148,7 +148,7 @@ function Add-CsvEntryForServer() {
         "Name" = $name;
         "VmType" = $vmType;
         "SubscriptionId" = $Subscription.SubscriptionId;
-        "SubscriptionName" = $Subscription.SubscriptionName;
+        "SubscriptionName" = $Subscription.Name;
         "ResourceGroup" = $resourceGroup;
         "Location" = $location;
         "AzSqlServerVersion" = $azSqlServerVersion;
@@ -174,7 +174,7 @@ $subscriptionsToSearch = @()
 if ($Subscriptions) {
     # For each subscription in the input parameter, try to retrieve the subscription first by ID and then by name.
     foreach ($subscription in $Subscriptions) {
-        $sub = Get-AzSubscription -SubscriptionId $subscription
+        $sub = Get-AzSubscription -SubscriptionId $subscription -ErrorAction SilentlyContinue
         if (-not $sub) {
             $sub = Get-AzSubscription -SubscriptionName $subscription
         }
