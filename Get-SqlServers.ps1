@@ -3,14 +3,15 @@
 # Azure PowerShell must be installed on the machine.
 # Run Connect-AzAccount in the current PowerShell session.
 #
-# To specify one or more subscriptions on the command line use:
-# .\Get-SqlServers.ps1 -SubscriptionIds "69db6f5b-4fbe-42df-b96e-1ff93b45f90f"
-# .\Get-SqlServers.ps1 -SubscriptionIds ("69db6f5b-4fbe-42df-b96e-1ff93b45f90f", "d58769f5-f832-4cd5-9dd6-49529bf2ba56")
+# To specify one or more subscriptions by name or ID on the command line use:
+# .\Get-SqlServers.ps1 -Subscriptions "69db6f5b-4fbe-42df-b96e-1ff93b45f90f"
+# .\Get-SqlServers.ps1 -Subscriptions "Subscription name"
+# .\Get-SqlServers.ps1 -Subscriptions ("Subscription name", "d58769f5-f832-4cd5-9dd6-49529bf2ba56")
 #
 
 [CmdletBinding()]
 Param(
-    [string[]]$SubscriptionIds,
+    [string[]]$Subscriptions,
     [string]$OutFile = ".\sqlservers.csv",
     [int]$CostDays = 0
 )
@@ -167,13 +168,21 @@ function Add-CsvEntryForServer() {
     $global:sqlServersCsv += $newCsvEntry;
 }
 
-# Determine the list of subscription IDs to search. If one or more subscription IDs was passed in the SubscriptionIds
-# argument, use those subscriptions. If the SubscriptionIds argument was empty, search all available subscriptions.
+# Determine the list of subscription IDs to search. If one or more subscriptions were passed in the Subscriptions
+# argument, use those subscriptions. If the Subscriptions argument was empty, search all available subscriptions.
 $subscriptionsToSearch = @()
-if ($SubscriptionIds) {
-    # For each subscription ID in the input parameter, retrieve the subscription object and add it to the list.
-    foreach ($id in $SubscriptionIds) {
-        $sub = Get-AzSubscription -SubscriptionId $id
+if ($Subscriptions) {
+    # For each subscription in the input parameter, try to retrieve the subscription first by ID and then by name.
+    foreach ($subscription in $Subscriptions) {
+        $sub = Get-AzSubscription -SubscriptionId $subscription
+        if (-not $sub) {
+            $sub = Get-AzSubscription -SubscriptionName $subscription
+        }
+
+        if (-not $sub) {
+            throw "Error: Could not retrieve subscription by name or ID: `"$subscription`""
+        }
+
         $subscriptionsToSearch += $sub
     }
 } else {
@@ -217,10 +226,12 @@ foreach ($subscription in $subscriptionsToSearch) {
     # pass each VM from Get-AzVM into Add-CsvEntryForServer to generate a report line for all VMs.
 
     # Using Get-AzVM, iterate all of the available Azure VMs in this Azure subscription.
+    <#
     foreach ($azVm in Get-AzVM) {
 
         Add-CsvEntryForServer -Subscription $subscription -AzVm $azVm -CostDays $CostDays
     }
+    #>
 }
 
 # Export the array of CSV entries to the output file.
