@@ -30,6 +30,12 @@ function Add-CsvEntryForServer() {
         [int]$CostDays          # The number of days to collect cost for or zero to skip cost. 
     )
 
+    # Determine the management group name of the subscription that this server belongs to.
+    $managementGroupName = "Unknown"
+    if ($global:managementGroupHashTable.ContainsKey($Subscription.Id)) {
+        $managementGroupName = $global:managementGroupHashTable[$Subscription.Id]
+    }
+
     # Determine the value of the resource ID column.
     $resourceId = "Unknown"
     if ($AzSqlServer -and $AzSqlServer.ResourceId) {
@@ -145,6 +151,7 @@ function Add-CsvEntryForServer() {
 
     # Create a new entry for the CSV with each of the desired properties.
     $newCsvEntry = [PSCustomObject] @{
+        "ManagementGroup" = $managementGroupName;
         "Name" = $name;
         "VmType" = $vmType;
         "SubscriptionId" = $Subscription.SubscriptionId;
@@ -189,6 +196,24 @@ if ($Subscriptions) {
     $subscriptionsToSearch = Get-AzSubscription
 }
 
+# Before we start iterating VMs, retrieve the management groups. Create a hash table associating each subscription with
+# the name of a management group. We'll use this hash table to determine which management group each VM belongs to.
+$global:managementGroupHashTable = @{}
+foreach ($global:managementGroup in Get-AzManagementGroup)
+{
+    $expandedGroup = Get-AzManagementGroup -GroupId $managementGroup.Name -Expand
+    foreach ($child in $expandedGroup.Children) {
+
+        # It is a bit confusing but the "Name" property of each child in the management group is actually
+        # the subscription ID. The "Name" property of the management group is DEV/PROD or whatever.
+        $global:managementGroupHashTable[$child.Name] = $managementGroup.Name
+    }
+}
+
+Write-Host "`nComplete list of subscriptions IDs and their management groups:"
+$global:managementGroupHashTable | Format-Table -AutoSize
+Write-Host
+
 # Create an empty array to hold the CSV entries. As the script runs it will add elements to $sqlServersCsv for each
 # SQL server found.
 $global:sqlServersCsv = @()
@@ -201,7 +226,7 @@ foreach ($subscription in $subscriptionsToSearch) {
     Write-Host "Searching subscription named `"$($subscription.Name)`" with ID $($subscription.SubscriptionId)..."
 
     # Select this subscription so that subsequent Get operations pull from this subscription.
-    $subscription | Select-AzSubscription 
+    $subscription | Select-AzSubscription | Out-Null
     Write-Host
 
     # Using Get-AzSqlServer, iterate all of the available SQL servers in this Azure subscription.
