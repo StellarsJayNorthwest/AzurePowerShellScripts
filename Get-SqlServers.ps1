@@ -200,7 +200,7 @@ foreach ($subscription in $subscriptionsToSearch) {
 
     Write-Host "Searching subscription named `"$($subscription.Name)`" with ID $($subscription.SubscriptionId)..."
 
-    # Select this subscription. This will cause Get-AzSqlServer will retrieve all of the SQL servers for this subscription.
+    # Select this subscription so that subsequent Get operations pull from this subscription.
     $subscription | Select-AzSubscription 
     Write-Host
 
