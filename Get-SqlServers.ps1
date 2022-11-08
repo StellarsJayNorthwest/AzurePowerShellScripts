@@ -222,16 +222,16 @@ foreach ($subscription in $subscriptionsToSearch) {
         Add-CsvEntryForServer -Subscription $subscription -AzSqlVm $sqlVm -AzVm $azureVm -CostDays $CostDays
     }
 
-    # Note: This just for testing/experimentation. Add-CsvEntryForServer works on any Azure VM. So you can
-    # pass each VM from Get-AzVM into Add-CsvEntryForServer to generate a report line for all VMs.
-
     # Using Get-AzVM, iterate all of the available Azure VMs in this Azure subscription.
-    <#
     foreach ($azVm in Get-AzVM) {
-
-        Add-CsvEntryForServer -Subscription $subscription -AzVm $azVm -CostDays $CostDays
+        
+        # Only include this VM if it is not an AzSqlVm
+        if (-not (Get-AzSqlVm -ResourceGroupName $azVm.ResourceGroupName -Name $azVm.Name -ErrorAction SilentlyContinue)) {
+            Add-CsvEntryForServer -Subscription $subscription -AzVm $azVm -CostDays $CostDays
+        } else {
+            Write-Host "Skipping AzVm that is also an AzSqlVm: $($azVm.Name) in $($azVm.ResourceGroupName) `'$($subscription.Name)`'"
+        }
     }
-    #>
 }
 
 # Export the array of CSV entries to the output file.
