@@ -32,11 +32,11 @@ function Add-CsvEntryForServer() {
 
     # Determine the value of the resource ID column.
     $resourceId = "Unknown"
-    if ($AzSqlServer) {
+    if ($AzSqlServer -and $AzSqlServer.ResourceId) {
         $resourceId = $AzSqlServer.ResourceId
-    } elseif ($AzSqlVm) {
+    } elseif ($AzSqlVm -and $AzSqlVm.ResourceId) {
         $resourceId = $AzSqlVm.ResourceId
-    } elseif ($AzVm) {
+    } elseif ($AzVm -and $AzVm.Id) {
         $resourceId = $AzVm.Id
     }
 
@@ -52,11 +52,11 @@ function Add-CsvEntryForServer() {
 
     # Determine the value of the name column.
     $name = "Unknown"
-    if ($AzSqlServer) {
+    if ($AzSqlServer -and $AzSqlServer.ServerName) {
         $name = $AzSqlServer.ServerName
-    } elseif ($AzSqlVm) {
+    } elseif ($AzSqlVm -and $AzSqlVm.Name) {
         $name = $AzSqlVm.Name
-    } elseif ($AzVm) {
+    } elseif ($AzVm -and $AzVm.Name) {
         $name = $AzVm.Name
     }
 
@@ -83,54 +83,54 @@ function Add-CsvEntryForServer() {
         $location = $AzVm.Location
     }
 
-    # Determine the value of the AzSqlServerVersion column. This is empty unless the object is an AzSqlServer.
-    $azSqlServerVersion = ""
+    # Determine the value of the AzSqlServerVersion column. This is "na" unless the object is an AzSqlServer.
+    $azSqlServerVersion = "na"
     if ($AzSqlServer) {
         $azSqlServerVersion = $AzSqlServer.ServerVersion
     }
 
-    # Determine the value of the VmSize column. This is empty unless an AzVm was passed in.
-    $vmSize = ""
-    if ($AzVm) {
+    # Determine the value of the VmSize column. This is "Unknown" unless an AzVm was passed in.
+    $vmSize = "na"
+    if ($AzVm -and $AzVm.HardwareProfile.VmSize.ToString()) {
         $vmSize = $AzVm.HardwareProfile.VmSize.ToString()
     }
 
     # Determine the number of cores if an AzVm was passed in. This is done by looking up the VM size for the region and
     # finding the VM size entry (i.e. the instance type) matching the VmSize string of the VM.
-    $numberOfCores = ""
+    $numberOfCores = "0"
     if ($AzVm) {
         $azVmSize = Get-AzVMSize -Location $AzVm.Location | Where-Object { $_.Name -eq $AzVm.HardwareProfile.VmSize }
         $numberOfCores = $azVmSize.NumberOfCores
     }
 
-    # Determine the value of the OsType column. This is empty unless the object is an AzVm.
-    $osType = ""
-    if ($AzVm) {
+    # Determine the value of the OsType column. This is "Unknown" unless the object is an AzVm.
+    $osType = "Unknown"
+    if ($AzVm -and $AzVm.StorageProfile.OsDisk.OsType.ToString()) {
         $osType = $AzVm.StorageProfile.OsDisk.OsType.ToString()
     }
 
     # Determine the value of the SKU column. Use Offer if this is an AzSqlVm else the SKU from the AzVm storage profile.
-    $sku = ""
-    if ($AzSqlVm) {
+    $sku = "Unknown"
+    if ($AzSqlVm -and $AzSqlVm.Offer) {
         $sku = $AzSqlVm.Offer
     }
-    elseif ($AzVm) {
+    elseif ($AzVm -and $AzVm.StorageProfile.ImageReference.Sku) {
         $sku = $AzVm.StorageProfile.ImageReference.Sku
     }
 
 
-    # Determine the value of the license type column. This is from either the AzSqlVm or the AzVm object, otherwise empty.
-    $licenseType = ""
-    if ($AzSqlVm) {
+    # Determine the value of the license type column. This is from either the AzSqlVm or the AzVm object, otherwise "na".
+    $licenseType = "na"
+    if ($AzSqlVm -and $AzSqlVm.LicenseType) {
         $licenseType = $AzSqlVm.LicenseType
-    } elseif ($AzVm) {
+    } elseif ($AzVm -and $AzVm.LicenseType) {
         $licenseType = $AzVm.LicenseType
     }
 
     # Compute cost for the AZ VM, if one was passed in. This is done by collecting the specified number of days of 
     # consumption usage details for the VM resource ID.
     [float]$cost = 0.0
-    $currency = ""
+    $currency = "na"
     $costUsageDetailCount = 0
     if ($AzVm -and ($CostDays -gt 0)) {
         $start = (Get-Date).AddDays(-$CostDays)
