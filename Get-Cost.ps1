@@ -1,25 +1,53 @@
 [CmdletBinding()]
 Param(
-    [DateTime] $Start = ((Get-Date).AddMonths(-1)),
-    [DateTime] $End = (Get-Date),
-    [string]$ResourceGroup)
+    [int] $MonthsToLookBack = 3,
+    [string]$OutFile = ".\cost.csv"
+)
 
 Write-Host
 
-$sub = Get-AzSubscription
-if ($ResourceGroup) {
-    Write-Host "Retrieving consumption usage details for subscription $($sub.SubscriptionId) from $Start to $End for resource group $ResourceGroup"
-    $consumptionDetails = Get-AzConsumptionUsageDetail -StartDate $Start -EndDate $End -ResourceGroup $ResourceGroup
-}
-else {
-    Write-Host "Retrieving consumption usage details for subscription $($sub.SubscriptionId) from $Start to $End"
-    $consumptionDetails = Get-AzConsumptionUsageDetail -StartDate $Start -EndDate $End
+$subscriptions = Get-AzSubscription
+
+$csvArray = @()
+
+$monthIndex = $MonthsToLookBack
+while ($monthIndex -gt 0) {
+
+    $today = Get-Date -Format "MM/dd/yyyy"
+    $monthStart = Get-Date $today -Day 1
+    $monthStart = $monthStart.AddMonths(-1 * $monthIndex)
+    $monthEnd = $monthStart.AddMonths(1).AddSeconds(-1)
+
+    foreach ($subscription in $subscriptions) {
+        $subscription | Select-AzSubscription | Out-Null
+
+        Write-Host "Gathering cost from $monthStart to $monthEnd for $($subscription.Name)"
+
+        $consumptionDetails = Get-AzConsumptionUsageDetail -StartDate $monthStart -EndDate $monthEnd
+
+        Write-Host "Retrieved $($consumptionDetails.Count) consumption usage entries"
+
+        $cost = 0
+        foreach ($c in $consumptionDetails) {
+            $cost = $cost + $c.PretaxCost
+            $currency = $c.Currency
+        }
+
+        Write-Host "Pre-tax cost from $monthStart to $monthEnd was $cost in $currency"
+
+        $row = "" | Select SubscriptionName, SubscriptionId, Start, End, Cost, Currency
+        $row.SubscriptionName = $subscription.Name
+        $row.SubscriptionId = $subscription.Id
+        $row.Start = Get-Date $monthStart -Format "MM/dd/yyyy"
+        $row.End = Get-Date $monthEnd -Format "MM/dd/yyyy"
+        $row.Cost = $cost
+        $row.Currency = $currency
+        $csvArray += $row
+
+    }
+
+    $monthIndex = $monthIndex - 1
 }
 
-Write-Host "Retrieved $($consumptionDetails.Count) consumption usage entries"
-
-$cost = 0
-foreach ($c in $consumptionDetails.PretaxCost) {
-    $cost += $c
-}
-Write-Host ("Pre-tax cost from $Start to $End was `${0:n2}" -f $cost)
+$csvArray | Export-Csv $OutFile -Force -NoTypeInformation
+Write-Host "Exported $($csvArray.Count) entries to $OutFile"
