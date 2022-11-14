@@ -2,12 +2,18 @@
 Param(
     [int] $MonthsBackToStart = 2,
     [int] $MonthsToCollect = 2,
-    [string]$OutFile = ".\cost.csv"
+    [string] $OutFile = ".\cost.csv",
+    [switch] $Append
 )
 
 Write-Host
 
 $startTime = Get-Date
+
+if ((Test-Path $OutFile) -and $Append) {
+    Write-Host
+    Write-Host "Output lines will be appended to $Outfile"
+}
 
 # Before we start iterating VMs, retrieve the management groups. Create a hash table associating each subscription with
 # the name of a management group. We'll use this hash table to determine which management group each VM belongs to.
@@ -129,7 +135,7 @@ while ($monthIndex -lt $MonthsToCollect) {
     $monthIndex = $monthIndex + 1
 }
 
-$csvArray | Export-Csv $OutFile -Force -NoTypeInformation
-Write-Host "Exported $($csvArray.Count) entries to $OutFile"
+$csvArray | Export-Csv $OutFile -NoTypeInformation -Append:$Append
+Write-Host "Exported with Append:$Append $($csvArray.Count) entries to $OutFile"
 Write-Host "Script started at $startTime and finished at $(Get-Date)"
 Write-Host "Script run time: $((Get-Date) - $startTime)"
