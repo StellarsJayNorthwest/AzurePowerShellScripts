@@ -1,7 +1,7 @@
 [CmdletBinding()]
 Param(
-    [int] $MonthsBackToStart = 12,
-    [int] $MonthsToCollect = 12,
+    [int] $MonthsBackToStart = 2,
+    [int] $MonthsToCollect = 2,
     [string]$OutFile = ".\cost.csv"
 )
 
@@ -66,28 +66,30 @@ while ($monthIndex -lt $MonthsToCollect) {
             $currency = ""
             foreach ($c in $consumptionDetails) {
 
-                # Save the currency string. We assume all details for this subscription use the same currency.
+                # Save the currency string. We assume all details use the same currency.
                 $currency = $c.Currency
 
+                # Use a regular expression to parse the resource group name out of the InstanceId.
                 if ($c.InstanceId -match "resourceGroups/(.*?)/") {
 
-                    $key = $Matches[1]
+                    # The name of the resource group has been saved in the Matches variable by PowerShell.
+                    $resourceGroupName = $Matches[1]
 
                     # For uniformity, convert all resource group names to lower case. This could be commented out.
-                    $key = $key.ToLower()
+                    $resourceGroupName = $resourceGroupName.ToLower()
 
-                    # Write-Host "Cost detail: $key cost $($c.PretaxCost)"
+                    # Write-Host "Cost detail: $resourceGroupName cost $($c.PretaxCost)"
 
                     # If the key exists, add this cost. Otherwise create a new key with this cost.
-                    if ($costHashTable.ContainsKey($key)) {
-                        $costHashTable[$key] = $costHashTable[$key] + $c.PretaxCost
+                    if ($costHashTable.ContainsKey($resourceGroupName)) {
+                        $costHashTable[$resourceGroupName] = $costHashTable[$resourceGroupName] + $c.PretaxCost
                     } else {
-                        $costHashTable[$key] = $c.PretaxCost
+                        $costHashTable[$resourceGroupName] = $c.PretaxCost
                     }
 
                 } else {
 
-                    Write-Host "Failed to get resource group from InstanceId `'$($c.InstanceId)`'"
+                    Write-Host "Failed to get resource group name from InstanceId `'$($c.InstanceId)`'"
                 }
             }
 
@@ -104,7 +106,7 @@ while ($monthIndex -lt $MonthsToCollect) {
 
                 # Write-Host "Pre-tax cost from $monthStart to $monthEnd for $resourceGroupName in $location was $($costHashTable[$resourceGroupName]) $currency"
 
-                $row = "" | Select ManagementGroup, SubscriptionName, SubscriptionId, ResourceGroup, Location, Start, End, Cost, Currency
+                $row = "" | Select ManagementGroup, SubscriptionName, SubscriptionId, ResourceGroup, Location, Start, End, PretaxCost, Currency
                 $row.ManagementGroup = $managementGroupName
                 $row.SubscriptionName = $subscription.Name
                 $row.SubscriptionId = $subscription.Id
@@ -112,7 +114,7 @@ while ($monthIndex -lt $MonthsToCollect) {
                 $row.Location = $location
                 $row.Start = Get-Date $monthStart -Format "MM/dd/yyyy"
                 $row.End = Get-Date $monthEnd -Format "MM/dd/yyyy"
-                $row.Cost = $costHashTable[$resourceGroupName]
+                $row.PretaxCost = $costHashTable[$resourceGroupName]
                 $row.Currency = $currency
                 $csvArray += $row
             }
